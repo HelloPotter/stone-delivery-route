@@ -1,7 +1,7 @@
 export type Customer={id:string;short:string;name:string;address:string;coords:string;note:string};
 export type Stop={id:string;customerId:string;meat:boolean;returns:boolean;cash:boolean;done:boolean;group:string;groupName:string};
 export type Task={id:string;date:string;confirmed:boolean;stops:Stop[]};
-export type Data={customers:Customer[];task:Task;template:Stop[];last:Stop[];history:{date:string;stops:Stop[]}[]};
+export type Data={customerSheetVersion?:string;customers:Customer[];task:Task;template:Stop[];last:Stop[];history:{date:string;stops:Stop[]}[]};
 export const locations=[{name:'公司',coords:'49.16156230599801, -122.96131901745241'},{name:'211 肉厂',coords:'49.16051109260114, -122.96235143803088'},{name:'Lefong 肉厂',coords:'49.16853107341961, -122.98640260871574'}];
 export function today(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Vancouver',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
 export function newTask():Task{return {id:crypto.randomUUID(),date:today(),confirmed:false,stops:[]}}

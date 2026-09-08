@@ -69,6 +69,10 @@ export default function Home() {
     uiRef = useRef(ui);
   uiRef.current = ui;
   function apply(e: Envelope) {
+    if(e.data.customerSheetVersion !== '2026-09-08T17:19:03.353Z') {
+      const updates = new Map(seed.map(c=>[c.id,c]));
+      e={...e,pending:true,data:{...e.data,customerSheetVersion:'2026-09-08T17:19:03.353Z',customers:e.data.customers.map(c=>{const fresh=updates.get(c.id);return fresh?{...c,coords:fresh.coords,note:fresh.note}:c})}};
+    }
     current.current = e;
     setData(e.data);
     try {
@@ -151,8 +155,7 @@ export default function Home() {
     let cancelled = false;
     const local = readLocal();
     if (local) {
-      current.current = local;
-      setData(local.data);
+      apply(local);
     }
     try {
       const saved = JSON.parse(localStorage.getItem('stone-ui') || 'null');
@@ -641,7 +644,7 @@ export default function Home() {
                             >
                               <strong>{c.name}</strong>
                               <small>
-                                {c.id}
+                                {c.id}{c.note && <span className="customer-note"> · {c.note}</span>}
                                 {missing.includes(s.id)
                                   ? ' · 可能漏送'
                                   : s.done
@@ -841,7 +844,7 @@ export default function Home() {
                   />
                   <button className="name" onClick={() => toggleCustomer(c)}>
                     <strong>{c.name}</strong>
-                    <small>{c.id}</small>
+                    <small>{c.id}{c.note && <span className="customer-note"> · {c.note}</span>}</small>
                   </button>
                   {s && flags(s, !locked)}
                   <button

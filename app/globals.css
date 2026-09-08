@@ -741,3 +741,5 @@ header .wordmark b {
     transition: none;
   }
 }
+
+.card .name small{white-space:normal;overflow-wrap:anywhere}.customer-note{color:#000;font-weight:400}
