@@ -29,6 +29,7 @@ import {
   Check,
   ChevronDown,
   LockKeyhole,
+  Link2,
   Navigation,
   Plus,
   Search,
@@ -508,6 +509,7 @@ export default function Home() {
           </div>
           <div className="sectiontitle">
             <h2>{locked ? '今日方案' : '安排顺序'}</h2>
+            {!locked && stops.length > 0 && <button className="clear-draft" onClick={()=>ask('全部移除？','清空当前草稿中的全部商户和附加条件。客户库、上次路线和完整模板会保留。',()=>{setStops(()=>[]);setSelected([]);setGroupOpen(false);setUI(x=>({...x,expanded:''}));})}>全部移除</button>}
             <span>
               {groups.length} 站 · {stops.length} 家
             </span>
@@ -622,7 +624,7 @@ export default function Home() {
                                   )
                                 }
                               >
-                                <LockKeyhole size={15} />
+                                <Link2 size={15} />
                               </button>
                             ) : (
                               <span className="number">
