@@ -1,4 +1,4 @@
-const CACHE='stone-shell-v2';
+const CACHE='stone-shell-v3';
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/manifest.webmanifest','/icon.svg'])))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('stone-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==location.origin||u.pathname.startsWith('/api/')||u.pathname.includes('auth')||e.request.headers.get('RSC'))return;if(e.request.mode==='navigate'){e.respondWith(fetch(e.request).then(r=>{if(r.ok&&!r.redirected&&new URL(r.url).pathname==='/'){const clone=r.clone();caches.open(CACHE).then(c=>c.put('/',clone))}return r}).catch(()=>caches.match('/').then(r=>r||new Response('请联网首次打开 Stone Delivery Route',{status:503}))));return}if(/\.(js|css|svg|woff2?|png)$/.test(u.pathname)){e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{if(res.ok){const copy=res.clone();caches.open(CACHE).then(c=>c.put(e.request,copy))}return res})))}});
