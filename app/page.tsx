@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import seed from '../data/customers.json';
+import { mergeSheet } from '@/lib/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
@@ -50,6 +51,9 @@ export default function Home() {
       expanded: '',
       scroll: 0,
     }),
+    [clockNow, setClockNow] = useState(Date.now()),
+    [sheetBusy, setSheetBusy] = useState(false),
+    [locating, setLocating] = useState(false),
     [status, setStatus] = useState('正在恢复…'),
     [selected, setSelected] = useState<string[]>([]),
     [groupName, setGroupName] = useState('停一站'),
@@ -68,11 +72,26 @@ export default function Home() {
     busy = useRef(false),
     conflicted = useRef(false),
     uiRef = useRef(ui);
+  useEffect(() => {
+    const t = setInterval(() => setClockNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
   uiRef.current = ui;
   function apply(e: Envelope) {
-    if(e.data.customerSheetVersion !== '2026-09-08T17:19:03.353Z') {
-      const updates = new Map(seed.map(c=>[c.id,c]));
-      e={...e,pending:true,data:{...e.data,customerSheetVersion:'2026-09-08T17:19:03.353Z',customers:e.data.customers.map(c=>{const fresh=updates.get(c.id);return fresh?{...c,coords:fresh.coords,note:fresh.note}:c})}};
+    if (e.data.customerSheetVersion !== '2026-09-08T17:19:03.353Z') {
+      const updates = new Map(seed.map((c) => [c.id, c]));
+      e = {
+        ...e,
+        pending: true,
+        data: {
+          ...e.data,
+          customerSheetVersion: '2026-09-08T17:19:03.353Z',
+          customers: e.data.customers.map((c) => {
+            const fresh = updates.get(c.id);
+            return fresh ? { ...c, coords: fresh.coords, note: fresh.note } : c;
+          }),
+        },
+      };
     }
     current.current = e;
     setData(e.data);
@@ -82,11 +101,16 @@ export default function Home() {
       setStatus('本机保存失败，请勿关闭页面');
     }
   }
-  function change(fn: (d: Data) => Data) {
+  function change(fn: (d: Data) => Data, remember = true) {
     if (!current.current) return;
     const e = {
       ...current.current,
-      data: fn(current.current.data),
+      data: {
+        ...fn(current.current.data),
+        ...(remember
+          ? { undo: (({ undo, ...rest }) => rest)(current.current.data) }
+          : {}),
+      },
       pending: true,
     };
     apply(e);
@@ -324,6 +348,8 @@ export default function Home() {
         ...d,
         task: {
           ...newTask(),
+          selecting: true,
+          keepIds: [],
           stops: resetStops(mode === 'last' ? d.last : d.template),
         },
       }));
@@ -336,6 +362,69 @@ export default function Home() {
         run,
       );
     else run();
+  }
+  async function importSheet(override = false) {
+    setSheetBusy(true);
+    try {
+      const r = await fetch('/api/customers-sheet', {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(20000),
+      });
+      const payload = (await r.json()) as {
+        customers: Customer[];
+        error?: string;
+      };
+      if (!r.ok) throw Error(payload.error);
+      change((d) => mergeSheet(d, payload.customers, override));
+      setError(
+        '已更新 ' +
+          payload.customers.length +
+          ' 家客户资料' +
+          (override ? '，已采用表格坐标' : '，保留手机记录的坐标'),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '同步失败，原资料保留');
+    } finally {
+      setSheetBusy(false);
+    }
+  }
+  function locate() {
+    if (!navigator.geolocation) {
+      setError('此浏览器不支持定位');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocating(false);
+        const coords = p.coords.latitude + ', ' + p.coords.longitude;
+        const id = original;
+        ask(
+          '保存当前卸货位置？',
+          '定位精度约 ±' +
+            Math.round(p.coords.accuracy) +
+            ' 米。' +
+            (p.coords.accuracy > 50
+              ? '当前精度较低，建议取消后移到室外重试。'
+              : '') +
+            '确认后替换原坐标。',
+          () => {
+            change((d) => ({
+              ...d,
+              customers: d.customers.map((c) =>
+                c.id === id ? { ...c, coords, coordsSource: 'phone' } : c,
+              ),
+            }));
+            setEditor((c) => (c ? { ...c, coords, coordsSource: 'phone' } : c));
+          },
+        );
+      },
+      () => {
+        setLocating(false);
+        setError('无法定位，请检查定位权限后重试；原坐标未修改');
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+    );
   }
   function toggleCustomer(c: Customer) {
     if (locked) {
@@ -483,6 +572,38 @@ export default function Home() {
             <p>
               {done} / {stops.length} 家已送达
             </p>
+            {data.task.startedAt ? (
+              <p className="elapsed">
+                已用时{' '}
+                {Math.floor(
+                  Math.max(0, clockNow - data.task.startedAt) / 3600000,
+                )
+                  .toString()
+                  .padStart(2, '0')}
+                :
+                {(
+                  Math.floor(
+                    Math.max(0, clockNow - data.task.startedAt) / 60000,
+                  ) % 60
+                )
+                  .toString()
+                  .padStart(2, '0')}
+              </p>
+            ) : (
+              locked && (
+                <button
+                  className="start-delivery"
+                  onClick={() =>
+                    change((d) => ({
+                      ...d,
+                      task: { ...d.task, startedAt: Date.now() },
+                    }))
+                  }
+                >
+                  开始配送
+                </button>
+              )
+            )}
           </div>
           <strong>
             {percent}
@@ -509,7 +630,25 @@ export default function Home() {
           </div>
           <div className="sectiontitle">
             <h2>{locked ? '今日方案' : '安排顺序'}</h2>
-            {!locked && stops.length > 0 && <button className="clear-draft" onClick={()=>ask('全部移除？','清空当前草稿中的全部商户和附加条件。客户库、上次路线和完整模板会保留。',()=>{setStops(()=>[]);setSelected([]);setGroupOpen(false);setUI(x=>({...x,expanded:''}));})}>全部移除</button>}
+            {!locked && stops.length > 0 && (
+              <button
+                className="clear-draft"
+                onClick={() =>
+                  ask(
+                    '全部移除？',
+                    '清空当前草稿中的全部商户和附加条件。客户库、上次路线和完整模板会保留。',
+                    () => {
+                      setStops(() => []);
+                      setSelected([]);
+                      setGroupOpen(false);
+                      setUI((x) => ({ ...x, expanded: '' }));
+                    },
+                  )
+                }
+              >
+                全部移除
+              </button>
+            )}
             <span>
               {groups.length} 站 · {stops.length} 家
             </span>
@@ -541,7 +680,7 @@ export default function Home() {
               </button>
             </div>
           )}
-          {!locked && selected.length > 0 && (
+          {!locked && !data.task.selecting && selected.length > 0 && (
             <div className="groupbar">
               <span>已选 {selected.length} 家</span>
               <button
@@ -554,6 +693,34 @@ export default function Home() {
                 合为停一站
               </button>
               <button onClick={() => setSelected([])}>取消</button>
+            </div>
+          )}
+          {data.task.selecting && (
+            <div className="keep-bar">
+              <p>点选要配送的商户：实色保留，半透明移除。</p>
+              <button
+                className="primary"
+                onClick={() =>
+                  ask(
+                    '保留所选商户？',
+                    '未选商户会从今日草稿移除，模板保持不变。',
+                    () =>
+                      change((d) => ({
+                        ...d,
+                        task: {
+                          ...d.task,
+                          stops: d.task.stops.filter((s) =>
+                            d.task.keepIds?.includes(s.id),
+                          ),
+                          selecting: false,
+                          keepIds: [],
+                        },
+                      })),
+                  )
+                }
+              >
+                保留所选（{data.task.keepIds?.length || 0}）
+              </button>
             </div>
           )}
           <SortableRoutes
@@ -572,7 +739,7 @@ export default function Home() {
                       <span>
                         {block.filter((x) => x.done).length}/{block.length}
                       </span>
-                      {!locked && (
+                      {!locked && !data.task.selecting && (
                         <button
                           onClick={() =>
                             setStops((ss) =>
@@ -594,13 +761,71 @@ export default function Home() {
                     return (
                       <SwipeCard
                         key={s.id}
-                        enabled={!locked}
+                        enabled={!locked && !data.task.selecting}
                         onRemove={() => {
                           setStops((ss) => ss.filter((x) => x.id !== s.id));
                           setSelected((ids) => ids.filter((id) => id !== s.id));
                         }}
                       >
                         <div
+                          role={data.task.selecting ? 'button' : undefined}
+                          tabIndex={data.task.selecting ? 0 : undefined}
+                          aria-pressed={
+                            data.task.selecting
+                              ? !!data.task.keepIds?.includes(s.id)
+                              : undefined
+                          }
+                          onKeyDown={(e) => {
+                            if (
+                              data.task.selecting &&
+                              (e.key === 'Enter' || e.key === ' ')
+                            ) {
+                              e.preventDefault();
+                              change(
+                                (d) => ({
+                                  ...d,
+                                  task: {
+                                    ...d.task,
+                                    keepIds: d.task.keepIds?.includes(s.id)
+                                      ? d.task.keepIds.filter(
+                                          (id) => id !== s.id,
+                                        )
+                                      : [...(d.task.keepIds || []), s.id],
+                                  },
+                                }),
+                                false,
+                              );
+                            }
+                          }}
+                          onClickCapture={(e) => {
+                            if (data.task.selecting) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              change(
+                                (d) => ({
+                                  ...d,
+                                  task: {
+                                    ...d.task,
+                                    keepIds: d.task.keepIds?.includes(s.id)
+                                      ? d.task.keepIds.filter(
+                                          (id) => id !== s.id,
+                                        )
+                                      : [...(d.task.keepIds || []), s.id],
+                                  },
+                                }),
+                                false,
+                              );
+                            }
+                          }}
+                          style={
+                            data.task.selecting
+                              ? {
+                                  opacity: data.task.keepIds?.includes(s.id)
+                                    ? 1
+                                    : 0.4,
+                                }
+                              : undefined
+                          }
                           className={
                             'cardwrap ' +
                             (s.done ? 'delivered ' : '') +
@@ -608,7 +833,7 @@ export default function Home() {
                           }
                         >
                           <div className="card">
-                            {!locked ? (
+                            {!locked && !data.task.selecting ? (
                               <button
                                 className={
                                   'lock-select' +
@@ -646,7 +871,13 @@ export default function Home() {
                             >
                               <strong>{c.name}</strong>
                               <small>
-                                {c.id}{c.note && <span className="customer-note"> · {c.note}</span>}
+                                {c.id}
+                                {c.note && (
+                                  <span className="customer-note">
+                                    {' '}
+                                    · {c.note}
+                                  </span>
+                                )}
                                 {missing.includes(s.id)
                                   ? ' · 可能漏送'
                                   : s.done
@@ -668,7 +899,7 @@ export default function Home() {
                               >
                                 <ChevronDown size={18} />
                               </button>
-                            ) : (
+                            ) : data.task.selecting ? null : (
                               handle
                             )}
                           </div>
@@ -716,7 +947,10 @@ export default function Home() {
                 <Navigation size={16} />
                 返回公司
               </button>
-              <div className="bottomactions">
+              <div
+                className="bottomactions"
+                style={data.task.selecting ? { display: 'none' } : undefined}
+              >
                 {locked ? (
                   <>
                     <button
@@ -741,7 +975,12 @@ export default function Home() {
                               last: d.task.stops,
                               history: [
                                 ...d.history,
-                                { date: d.task.date, stops: d.task.stops },
+                                {
+                                  date: d.task.date,
+                                  stops: d.task.stops,
+                                  startedAt: d.task.startedAt,
+                                  endedAt: Date.now(),
+                                },
                               ],
                               task: newTask(),
                             }));
@@ -846,7 +1085,12 @@ export default function Home() {
                   />
                   <button className="name" onClick={() => toggleCustomer(c)}>
                     <strong>{c.name}</strong>
-                    <small>{c.id}{c.note && <span className="customer-note"> · {c.note}</span>}</small>
+                    <small>
+                      {c.id}
+                      {c.note && (
+                        <span className="customer-note"> · {c.note}</span>
+                      )}
+                    </small>
                   </button>
                   {s && flags(s, !locked)}
                   <button
@@ -869,7 +1113,47 @@ export default function Home() {
       {ui.view === 'settings' && (
         <>
           <div className="sectiontitle">
-            <h2>设置与记录</h2>
+            <h2>设置与记录 · 2.0</h2>
+          </div>
+          <div className="setting">
+            <h3>客户资料更新</h3>
+            <p>从 Google Sheet 更新资料，默认保留手机记录坐标。</p>
+            <button disabled={sheetBusy} onClick={() => void importSheet()}>
+              {sheetBusy ? '正在同步…' : '一键更新客户资料'}
+            </button>
+            <button
+              disabled={sheetBusy}
+              onClick={() =>
+                ask(
+                  '用表格坐标覆盖？',
+                  '这将替换手机记录的卸货坐标，可在设置中撤销。',
+                  () => void importSheet(true),
+                )
+              }
+            >
+              用表格坐标覆盖
+            </button>
+          </div>
+          <div className="setting">
+            <h3>撤销操作</h3>
+            <p>
+              恢复最近一次操作前的数据，包括清空、筛选、送达、定位及资料同步。
+            </p>
+            <button
+              disabled={!data.undo}
+              onClick={() =>
+                ask('撤销最近一次操作？', '将恢复上次操作之前的记录。', () => {
+                  change(
+                    (d) => (d.undo ? { ...d.undo, undo: undefined } : d),
+                    false,
+                  );
+                  setSelected([]);
+                  setEditor(null);
+                })
+              }
+            >
+              撤销最近一次操作
+            </button>
           </div>
           <div className="setting">
             <h3>路线服务</h3>
@@ -1004,20 +1288,41 @@ export default function Home() {
           </DialogDescription>
           {editor && (
             <form onSubmit={saveCustomer}>
-              {(['id', 'name', 'address', 'coords'] as const).map((k, i) => (
-                <label key={k}>
-                  {['客户编号', '客户全称', '客户地址', '卸货坐标（可选）'][i]}
-                  <input
-                    disabled={k === 'id' && !!original}
-                    required={k === 'id' || k === 'name'}
-                    value={editor[k]}
-                    onChange={(e) =>
-                      setEditor({ ...editor, [k]: e.target.value })
+              {original && (
+                <button type="button" disabled={locating} onClick={locate}>
+                  {locating ? '正在定位…' : '记录当前卸货位置'}
+                </button>
+              )}
+              {(['id', 'name', 'address', 'coords', 'note'] as const).map(
+                (k, i) => (
+                  <label key={k}>
+                    {
+                      [
+                        '客户编号',
+                        '客户全称',
+                        '客户地址',
+                        '卸货坐标（可选）',
+                        '备注',
+                      ][i]
                     }
-                    placeholder={k === 'coords' ? '49.17, -123.13' : ''}
-                  />
-                </label>
-              ))}
+                    <input
+                      disabled={k === 'id' && !!original}
+                      required={k === 'id' || k === 'name'}
+                      value={editor[k]}
+                      onChange={(e) =>
+                        setEditor({
+                          ...editor,
+                          [k]: e.target.value,
+                          ...(k === 'coords'
+                            ? { coordsSource: 'phone' as const }
+                            : {}),
+                        })
+                      }
+                      placeholder={k === 'coords' ? '49.17, -123.13' : ''}
+                    />
+                  </label>
+                ),
+              )}
               <button className="primary full" type="submit">
                 保存客户
               </button>
