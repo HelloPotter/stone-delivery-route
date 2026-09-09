@@ -143,3 +143,5 @@ export function target(c: Customer) {
       : `${c.address}, Richmond, BC, Canada`)
   );
 }
+
+export function retainSelected(stops:Stop[],ids:string[]):Stop[]{const kept=stops.filter(s=>ids.includes(s.id));const counts=new Map<string,number>();for(const s of kept)if(s.group)counts.set(s.group,(counts.get(s.group)||0)+1);return kept.map(s=>s.group&&counts.get(s.group)===1?{...s,group:'',groupName:''}:s)}

@@ -20,6 +20,7 @@ import {
   newTask,
   previousPending,
   resetStops,
+  retainSelected,
   target,
   type Customer,
   type Data,
@@ -709,9 +710,7 @@ export default function Home() {
                         ...d,
                         task: {
                           ...d.task,
-                          stops: d.task.stops.filter((s) =>
-                            d.task.keepIds?.includes(s.id),
-                          ),
+                          stops: retainSelected(d.task.stops,d.task.keepIds||[]),
                           selecting: false,
                           keepIds: [],
                         },
