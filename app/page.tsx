@@ -696,32 +696,7 @@ export default function Home() {
               <button onClick={() => setSelected([])}>取消</button>
             </div>
           )}
-          {data.task.selecting && (
-            <div className="keep-bar">
-              <p>点选要配送的商户：实色保留，半透明移除。</p>
-              <button
-                className="primary"
-                onClick={() =>
-                  ask(
-                    '保留所选商户？',
-                    '未选商户会从今日草稿移除，模板保持不变。',
-                    () =>
-                      change((d) => ({
-                        ...d,
-                        task: {
-                          ...d.task,
-                          stops: retainSelected(d.task.stops,d.task.keepIds||[]),
-                          selecting: false,
-                          keepIds: [],
-                        },
-                      })),
-                  )
-                }
-              >
-                保留所选（{data.task.keepIds?.length || 0}）
-              </button>
-            </div>
-          )}
+          {data.task.selecting && stops.length > 0 && <p className="keep-hint">点选要配送的商户：实色保留，半透明移除。</p>}
           <SortableRoutes
             items={groups.map((b) => b[0].group || b[0].id)}
             onMove={move}
@@ -937,6 +912,32 @@ export default function Home() {
               );
             }}
           />
+          {data.task.selecting && stops.length > 0 && (
+            <div className="keep-bar keep-bottom">
+              <button onClick={()=>change(d=>({...d,task:{...d.task,stops:retainSelected(d.task.stops,d.task.stops.map(s=>s.id)),selecting:false,keepIds:[]}}))}>全部保留</button>
+              <button
+                className="primary"
+                onClick={() =>
+                  ask(
+                    '保留所选商户？',
+                    '未选商户会从今日草稿移除，模板保持不变。',
+                    () =>
+                      change((d) => ({
+                        ...d,
+                        task: {
+                          ...d.task,
+                          stops: retainSelected(d.task.stops,d.task.keepIds||[]),
+                          selecting: false,
+                          keepIds: [],
+                        },
+                      })),
+                  )
+                }
+              >
+                保留所选（{data.task.keepIds?.length || 0}）
+              </button>
+            </div>
+          )}
           {stops.length > 0 && (
             <>
               <button

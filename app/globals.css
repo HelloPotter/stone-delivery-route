@@ -747,3 +747,5 @@ header .wordmark b {
 .sectiontitle .clear-draft{margin-left:auto;margin-right:12px;color:#777;font-size:13px;padding:4px 8px}
 
 .summary .elapsed{margin-top:6px;color:#ddd;font-variant-numeric:tabular-nums}.start-delivery{margin-top:6px;padding:4px 10px;min-height:32px;background:#ed6417;color:white;font-size:13px}.keep-bar{padding:12px;background:#fff0e5;border-radius:12px;margin:10px 0}.keep-bar p{font-size:13px}.cardwrap{transition:opacity .18s ease}
+
+.keep-bottom{display:flex;gap:10px}.keep-bottom button{flex:1;font-size:14px}.keep-hint{font-size:13px;color:#777;margin:12px 0}
