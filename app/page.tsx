@@ -561,7 +561,7 @@ export default function Home() {
           </span>
         </header>
         <section className="summary">
-          <div>
+          <div className="summary-left">
             <small>{locked ? '配送进行中' : '今日配送 · 草稿'}</small>
             <h2>
               {done === stops.length && done
@@ -573,9 +573,12 @@ export default function Home() {
             <p>
               {done} / {stops.length} 家已送达
             </p>
+          </div>
+          <div className="summary-right">
+            <strong className="summary-percent">{percent}<em>%</em></strong>
             {data.task.startedAt ? (
               <p className="elapsed">
-                已用时{' '}
+                <span>已用时</span><b>
                 {Math.floor(
                   Math.max(0, clockNow - data.task.startedAt) / 3600000,
                 )
@@ -589,7 +592,7 @@ export default function Home() {
                 )
                   .toString()
                   .padStart(2, '0')}
-              </p>
+              </b></p>
             ) : (
               locked && (
                 <button
@@ -606,10 +609,6 @@ export default function Home() {
               )
             )}
           </div>
-          <strong>
-            {percent}
-            <em>%</em>
-          </strong>
         </section>
         <p className="sync" aria-live="polite">
           {status}
