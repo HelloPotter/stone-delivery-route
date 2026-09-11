@@ -43,6 +43,18 @@ import {
 } from 'lucide-react';
 const flagKeys = ['meat', 'returns', 'cash'] as const;
 const flagText = ['肉', '退', '款'];
+function historyTime(value?: number) {
+  if (value == null || !Number.isFinite(value)) return '未记录';
+  return new Date(value).toLocaleString('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
+}
+function historyDuration(start?: number, end?: number) {
+  if (start == null || end == null || !Number.isFinite(start) || !Number.isFinite(end) || end < start) return '未记录';
+  const seconds = Math.floor((end - start) / 1000);
+  return `${Math.floor(seconds / 3600)}小时 ${Math.floor(seconds / 60) % 60}分 ${seconds % 60}秒`;
+}
 type UI = { view: string; search: string; expanded: string; scroll: number };
 export default function Home() {
   const [data, setData] = useState<Data | null>(null),
@@ -1233,10 +1245,34 @@ export default function Home() {
                 .slice()
                 .reverse()
                 .map((h, i) => (
-                  <p key={i}>
-                    {h.date}　{h.stops.filter((s) => s.done).length} /{' '}
-                    {h.stops.length} 家已送达
-                  </p>
+                  <details className="history-task" key={JSON.stringify(h)}>
+                    <summary>
+                      <span>{h.date}</span>
+                      <span>{h.stops.filter((s) => s.done).length} / {h.stops.length} 家已送达</span>
+                      <ChevronDown size={18} aria-hidden="true" />
+                    </summary>
+                    <dl className="history-info">
+                      <div><dt>启动时间</dt><dd>{historyTime(h.startedAt)}</dd></div>
+                      <div><dt>结束时间</dt><dd>{historyTime(h.endedAt)}</dd></div>
+                      <div><dt>配送总用时</dt><dd>{historyDuration(h.startedAt, h.endedAt)}</dd></div>
+                      <div><dt>完成情况</dt><dd>
+                        {h.stops.length ? Math.round(h.stops.filter((s) => s.done).length / h.stops.length * 100) : 0}%
+                        {' · '}{h.stops.filter((s) => s.done).length} / {h.stops.length} 家已送达
+                        {h.stops.some((s) => !s.done) && <>，{h.stops.filter((s) => !s.done).length} 家未送达</>}
+                      </dd></div>
+                    </dl>
+                    <button className="history-delete" onClick={() => {
+                      const record = JSON.stringify(h);
+                      const index = data.history.length - 1 - i;
+                      ask('删除这条已结束任务？', `删除 ${h.date} 的这次配送记录，不影响客户库和完整模板。可在设置中撤销最近一次操作。`, () =>
+                        change((d) => {
+                          // Refuse a stale index if another device changed history.
+                          if (JSON.stringify(d.history[index]) !== record) return d;
+                          return { ...d, history: d.history.filter((_, j) => j !== index) };
+                        })
+                      );
+                    }}>删除任务</button>
+                  </details>
                 ))
             ) : (
               <p>尚无已结束任务</p>
