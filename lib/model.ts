@@ -145,3 +145,17 @@ export function target(c: Customer) {
 }
 
 export function retainSelected(stops:Stop[],ids:string[]):Stop[]{const kept=stops.filter(s=>ids.includes(s.id));const counts=new Map<string,number>();for(const s of kept)if(s.group)counts.set(s.group,(counts.get(s.group)||0)+1);return kept.map(s=>s.group&&counts.get(s.group)===1?{...s,group:'',groupName:''}:s)}
+
+export function updateCustomer(data: Data, original: string, customer: Customer): Data {
+  if (data.customers.some(c => c.id === customer.id && c.id !== original)) throw new Error('客户编号已存在');
+  if (original && !data.customers.some(c => c.id === original)) throw new Error('客户资料已变化，请重新打开后编辑');
+  const remap = (stops: Stop[]) => stops.map(s => s.customerId === original ? { ...s, customerId: customer.id } : s);
+  return {
+    ...data,
+    customers: original ? data.customers.map(c => c.id === original ? customer : c) : [...data.customers, customer],
+    template: original ? remap(data.template) : [...data.template, makeStop(customer.id)],
+    task: original ? { ...data.task, stops: remap(data.task.stops) } : data.task,
+    last: original ? remap(data.last) : data.last,
+    history: original ? data.history.map(h => ({ ...h, stops: remap(h.stops) })) : data.history,
+  };
+}

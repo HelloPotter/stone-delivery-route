@@ -21,6 +21,7 @@ import {
   previousPending,
   resetStops,
   retainSelected,
+  updateCustomer,
   target,
   type Customer,
   type Data,
@@ -527,13 +528,12 @@ export default function Home() {
       setError('客户编号已存在');
       return;
     }
-    change((d) => ({
-      ...d,
-      customers: original
-        ? d.customers.map((x) => (x.id === original ? c : x))
-        : [...d.customers, c],
-      template: original ? d.template : [...d.template, makeStop(c.id)],
-    }));
+    try {
+      change((d) => updateCustomer(d, original, c));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '客户保存失败');
+      return;
+    }
     setEditor(null);
   }
   const flags = (s: Stop, editable: boolean) => (
@@ -1341,7 +1341,6 @@ export default function Home() {
                       ][i]
                     }
                     <input
-                      disabled={k === 'id' && !!original}
                       required={k === 'id' || k === 'name'}
                       value={editor[k]}
                       onChange={(e) =>
