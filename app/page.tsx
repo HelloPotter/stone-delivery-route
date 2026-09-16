@@ -352,10 +352,10 @@ export default function Home() {
   function ask(title: string, text: string, run: () => void) {
     setConfirm({ title, text, run });
   }
-  function load(mode: 'last' | 'template') {
-    const src = mode === 'last' ? data!.last : data!.template;
+  function loadTemplate() {
+    const src = data!.template;
     if (!src.length) {
-      setError('还没有上次路线');
+      setError('完整模板还没有商户');
       return;
     }
     const run = () => {
@@ -365,7 +365,7 @@ export default function Home() {
           ...newTask(),
           selecting: true,
           keepIds: [],
-          stops: resetStops(mode === 'last' ? d.last : d.template),
+          stops: resetStops(d.template),
         },
       }));
       view('route');
@@ -634,12 +634,12 @@ export default function Home() {
               <Plus size={17} />
               选择客户
             </button>
-            <button disabled={locked} onClick={() => load('last')}>
-              载入上次
-            </button>
-            <button disabled={locked} onClick={() => load('template')}>
+            <button disabled={locked} onClick={() => loadTemplate()}>
               完整路线
             </button>
+            <button disabled={locked || !!data.task.selecting || !stops.length} onClick={() =>
+              change(d => ({ ...d, task: { ...d.task, stops: sortByTemplate(d.task.stops, d.template) } }))
+            }>自动排序</button>
           </div>
           <div className="sectiontitle">
             <h2>{locked ? '今日方案' : '安排顺序'}</h2>
@@ -649,7 +649,7 @@ export default function Home() {
                 onClick={() =>
                   ask(
                     '全部移除？',
-                    '清空当前草稿中的全部商户和附加条件。客户库、上次路线和完整模板会保留。',
+                    '清空当前草稿中的全部商户和附加条件。客户库、历史任务和完整模板会保留。',
                     () => {
                       setStops(() => []);
                       setSelected([]);
@@ -669,11 +669,6 @@ export default function Home() {
           <div className="origin">
             <Truck size={17} />
             <span>公司出发{hasMeat ? ' → 211 → Lefong' : ''}</span>
-            {!data.task.confirmed && !data.task.selecting && stops.length > 0 && (
-              <button className="template-sort" onClick={() =>
-                change(d => ({ ...d, task: { ...d.task, stops: sortByTemplate(d.task.stops, d.template) } }))
-              }>自动排序</button>
-            )}
           </div>
           {hasMeat && (
             <div className="factory">
@@ -1267,6 +1262,18 @@ export default function Home() {
                         {h.stops.some((s) => !s.done) && <>，{h.stops.filter((s) => !s.done).length} 家未送达</>}
                       </dd></div>
                     </dl>
+                    <details className="history-route">
+                      <summary>路线清单（{h.stops.length} 家）<ChevronDown size={18} aria-hidden="true" /></summary>
+                      <ol>
+                        {h.stops.map((stop, index) => (
+                          <li key={stop.id + ':' + index}>
+                            <span className="history-route-number">{index + 1}.</span>
+                            <span>{data.customers.find(c => c.id === stop.customerId)?.name || stop.customerId}</span>
+                          </li>
+                        ))}
+                      </ol>
+                      {!h.stops.length && <p>此任务没有商户记录</p>}
+                    </details>
                     <button className="history-delete" onClick={() => {
                       const record = JSON.stringify(h);
                       const index = data.history.length - 1 - i;

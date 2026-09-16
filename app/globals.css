@@ -766,3 +766,28 @@ header .wordmark b {
 
 .origin { flex-wrap: wrap; }
 .template-sort { margin-left: auto; flex-shrink: 0; min-height: 40px; padding: 7px 12px; border: 1px solid #edc7a5; border-radius: 10px; background: #fff3e8; color: #a74709; font-size: 14px; font-weight: 600; }
+
+
+/* Shared action buttons: neutral, primary, and destructive. */
+.toolbar button, .factory button, .keep-bottom button,
+.bottomactions button, .setting > button, .history-delete,
+.modal button, .actions button {
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #dedfe1;
+  background: #fff;
+  color: #242424;
+  font-size: 14px;
+  font-weight: 500;
+}
+.toolbar button { padding: 10px 5px; }
+.toolbar button:first-child { color: #242424; }
+button.primary { border-color: #ed6417; font-weight: 700; }
+.history-delete, button.clear-draft { color: #bc3030; }
+.history-route { border-top: 1px solid #e4e4e7; margin: 4px 0 12px; }
+.history-route > summary { justify-content: space-between; font-weight: 500; }
+.history-task[open] .history-route:not([open]) > summary svg { transform: none; }
+.history-route ol { list-style: none; padding: 0; margin: 0 0 12px; }
+.history-route li { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid #f0f0f0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.history-route-number { flex: 0 0 25px; color: #777; font-variant-numeric: tabular-nums; }
