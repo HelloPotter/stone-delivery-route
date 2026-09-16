@@ -21,6 +21,7 @@ import {
   previousPending,
   resetStops,
   retainSelected,
+  sortByTemplate,
   updateCustomer,
   target,
   type Customer,
@@ -668,6 +669,11 @@ export default function Home() {
           <div className="origin">
             <Truck size={17} />
             <span>公司出发{hasMeat ? ' → 211 → Lefong' : ''}</span>
+            {!data.task.confirmed && !data.task.selecting && stops.length > 0 && (
+              <button className="template-sort" onClick={() =>
+                change(d => ({ ...d, task: { ...d.task, stops: sortByTemplate(d.task.stops, d.template) } }))
+              }>自动排序</button>
+            )}
           </div>
           {hasMeat && (
             <div className="factory">

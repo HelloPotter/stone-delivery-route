@@ -159,3 +159,12 @@ export function updateCustomer(data: Data, original: string, customer: Customer)
     history: original ? data.history.map(h => ({ ...h, stops: remap(h.stops) })) : data.history,
   };
 }
+
+export function sortByTemplate(stops: Stop[], template: Stop[]): Stop[] {
+  const rank = new Map(template.map((s, i) => [s.customerId, i]));
+  const position = (s: Stop) => rank.get(s.customerId) ?? Infinity;
+  return blocks(stops)
+    .map(block => ({ block, rank: Math.min(...block.map(position)) }))
+    .sort((a, b) => a.rank - b.rank)
+    .flatMap(({ block }) => [...block].sort((a, b) => position(a) - position(b)));
+}
